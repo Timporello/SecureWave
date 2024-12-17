@@ -1,108 +1,137 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from steg import AudioSteganography
+from analysis import AudioAnalysis
 
 
 class StegGUI:
-    """
-    A Tkinter-based GUI to interact with the AudioSteganography class.
-    Allows user to choose between 'hide' and 'extract' modes,
-    select files, and either embed or extract a message.
-    """
-
     def __init__(self, master):
         self.master = master
         self.master.title("Audio Steganography")
 
-        # Instance of our steganography logic class
         self.steg = AudioSteganography()
+        self.analysis = AudioAnalysis()
 
-        # Mode: hide or extract
         self.mode_var = tk.StringVar(value="hide")
 
-        # Radio buttons for mode selection
-        self.hide_radio = tk.Radiobutton(master, text="Hide Message", variable=self.mode_var,
+        # ========== Configure root window grid ==========
+        self.master.rowconfigure(0, weight=0)  # Mode selection
+        self.master.rowconfigure(1, weight=0)  # Input frame
+        self.master.rowconfigure(2, weight=1)  # Message/Extracted frame
+        self.master.rowconfigure(3, weight=0)  # Buttons frame
+        self.master.columnconfigure(0, weight=1)
+
+        # ========== Frame: Mode selection ==========
+        mode_frame = tk.Frame(self.master)
+        mode_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+
+        self.hide_radio = tk.Radiobutton(mode_frame, text="Hide Message", variable=self.mode_var,
                                          value="hide", command=self.toggle_mode)
-        self.extract_radio = tk.Radiobutton(master, text="Extract Message", variable=self.mode_var,
+        self.extract_radio = tk.Radiobutton(mode_frame, text="Extract Message", variable=self.mode_var,
                                             value="extract", command=self.toggle_mode)
-        self.hide_radio.grid(row=0, column=0, padx=10, pady=10)
-        self.extract_radio.grid(row=0, column=1, padx=10, pady=10)
 
-        # Input file selection (for either mode)
-        tk.Label(master, text="Input WAV:").grid(row=1, column=0, sticky='e', padx=5, pady=5)
-        self.input_entry = tk.Entry(master, width=50)
-        self.input_entry.grid(row=1, column=1, padx=5, pady=5)
-        self.input_browse = tk.Button(master, text="Browse", command=self.browse_input)
-        self.input_browse.grid(row=1, column=2, padx=5, pady=5)
+        self.hide_radio.pack(side="left", padx=(0, 20))
+        self.extract_radio.pack(side="left")
 
-        # Output file selection (for hide mode only)
-        self.output_label = tk.Label(master, text="Output WAV:")
-        self.output_label.grid(row=2, column=0, sticky='e', padx=5, pady=5)
-        self.output_entry = tk.Entry(master, width=50)
-        self.output_entry.grid(row=2, column=1, padx=5, pady=5)
-        self.output_browse = tk.Button(master, text="Browse", command=self.browse_output)
-        self.output_browse.grid(row=2, column=2, padx=5, pady=5)
+        # ========== Frame: Input and Save ==========
+        input_frame = tk.Frame(self.master)
+        input_frame.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
 
-        # Message text (for hide mode only)
-        self.message_label = tk.Label(master, text="Message:")
-        self.message_label.grid(row=3, column=0, sticky='e', padx=5, pady=5)
-        self.message_text = tk.Text(master, width=50, height=5)
-        self.message_text.grid(row=3, column=1, columnspan=2, padx=5, pady=5)
+        input_frame.columnconfigure(1, weight=1)
 
-        # Extracted message display (for extract mode)
-        self.extracted_label = tk.Label(master, text="Extracted Message:")
-        self.extracted_text = tk.Text(master, width=50, height=5, state='disabled')
+        tk.Label(input_frame, text="Input audio:").grid(row=0, column=0, sticky='e', padx=10, pady=5)
+        self.input_entry = tk.Entry(input_frame)
+        self.input_entry.grid(row=0, column=1, padx=10, pady=5, sticky="ew")
+        self.input_browse = tk.Button(input_frame, text="Browse", command=self.browse_input)
+        self.input_browse.grid(row=0, column=2, padx=10, pady=5, sticky="w")
 
-        # Action button
-        self.action_button = tk.Button(master, text="Hide Message", command=self.execute_action)
-        self.action_button.grid(row=4, column=1, pady=10)
+        # Save as button (for hide mode)
+        self.save_button = tk.Button(input_frame, text="Save as", command=self.save_as)
+
+        # ========== Frame: Message/Extracted Text ==========
+        # We'll create both frames and show/hide them depending on the mode
+        self.hide_frame = tk.Frame(self.master)
+        self.hide_frame.columnconfigure(0, weight=0)
+        self.hide_frame.columnconfigure(1, weight=1)
+        self.hide_frame.grid(row=2, column=0, padx=10, pady=10, sticky="nsew")
+
+        self.message_label = tk.Label(self.hide_frame, text="Message:")
+        self.message_label.grid(row=0, column=0, sticky='e', padx=10, pady=10)
+        self.message_text = tk.Text(self.hide_frame, wrap="word")
+        self.message_text.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+
+        self.hide_frame.rowconfigure(0, weight=1)
+
+        self.extract_frame = tk.Frame(self.master)
+        self.extract_frame.columnconfigure(0, weight=0)
+        self.extract_frame.columnconfigure(1, weight=1)
+        self.extract_frame.grid(row=2, column=0, padx=10, pady=10, sticky="nsew")
+
+        self.extracted_label = tk.Label(self.extract_frame, text="Extracted Message:")
+        self.extracted_label.grid(row=0, column=0, sticky='e', padx=10, pady=10)
+        self.extracted_text = tk.Text(self.extract_frame, wrap="word", state='disabled')
+        self.extracted_text.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+
+        self.extract_frame.rowconfigure(0, weight=1)
+
+        # ========== Frame: Action Buttons ==========
+        button_frame = tk.Frame(self.master)
+        button_frame.grid(row=3, column=0, padx=10, pady=10, sticky="ew")
+
+        button_frame.columnconfigure(0, weight=1)
+        button_frame.columnconfigure(1, weight=0)
+
+        self.action_button = tk.Button(button_frame, text="Hide Message", command=self.execute_action)
+        self.action_button.grid(row=0, column=0, padx=10, pady=5, sticky="e")
+
+        self.spectrogram_button = tk.Button(button_frame, text="Show Spectrogram", command=self.show_spectrogram)
+        self.spectrogram_button.grid(row=0, column=1, padx=10, pady=5, sticky="w")
+
+        # Hold the chosen output path when "Save as" is clicked
+        self.output_path = None
 
         self.toggle_mode()
 
     def toggle_mode(self):
-        """Enable/disable fields depending on mode (hide or extract)."""
         mode = self.mode_var.get()
         if mode == "hide":
-            # Show fields for hiding
-            self.output_label.grid()
-            self.output_entry.grid()
-            self.output_browse.grid()
-            self.message_label.grid()
-            self.message_text.grid()
-            self.extracted_label.grid_remove()
-            self.extracted_text.grid_remove()
+            # Show hide mode widgets
+            self.save_button.grid(row=1, column=2, padx=10, pady=5, sticky="w")
+            self.hide_frame.grid()
+            self.extract_frame.grid_remove()
 
             self.action_button.config(text="Hide Message")
         else:
-            # Show fields for extracting
-            self.output_label.grid_remove()
-            self.output_entry.grid_remove()
-            self.output_browse.grid_remove()
-            self.message_label.grid_remove()
-            self.message_text.grid_remove()
-
-            self.extracted_label.grid(row=2, column=0, sticky='e', padx=5, pady=5)
-            self.extracted_text.grid(row=2, column=1, columnspan=2, padx=5, pady=5)
-            self.extracted_text.config(state='disabled')
+            # Show extract mode widgets
+            self.save_button.grid_remove()
+            self.extract_frame.grid()
+            self.hide_frame.grid_remove()
 
             self.action_button.config(text="Extract Message")
 
     def browse_input(self):
-        """Open file dialog to select input WAV."""
-        filename = filedialog.askopenfilename(filetypes=[("WAV files", "*.wav")])
+        filename = filedialog.askopenfilename(
+            filetypes=[
+                ("Audio Files", ("*.wav", "*.mp3", "*.m4a", "*.flac", "*.ogg", "*.aac", "*.wma", "*.webm")),
+                ("All Files", "*.*")
+            ]
+        )
         if filename:
             self.input_entry.delete(0, tk.END)
             self.input_entry.insert(0, filename)
 
-    def browse_output(self):
-        """Open file dialog to select output WAV."""
-        filename = filedialog.asksaveasfilename(defaultextension=".wav", filetypes=[("WAV files", "*.wav")])
+    def save_as(self):
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".wav",
+            filetypes=[
+                ("Audio Files", ("*.wav", "*.mp3", "*.m4a", "*.flac", "*.ogg", "*.aac", "*.wma", "*.webm")),
+                ("All Files", "*.*")
+            ]
+        )
         if filename:
-            self.output_entry.delete(0, tk.END)
-            self.output_entry.insert(0, filename)
+            self.output_path = filename
 
     def execute_action(self):
-        """Perform the hide or extract action based on the chosen mode."""
         mode = self.mode_var.get()
         input_path = self.input_entry.get().strip()
 
@@ -111,19 +140,19 @@ class StegGUI:
             return
 
         if mode == "hide":
-            output_path = self.output_entry.get().strip()
+            if not self.output_path:
+                messagebox.showerror("Error", "Please choose a location to save the output file.")
+                return
+
             message = self.message_text.get("1.0", tk.END).strip()
 
-            if not output_path:
-                messagebox.showerror("Error", "Please select an output file.")
-                return
             if not message:
                 messagebox.showerror("Error", "Please enter a message.")
                 return
 
             try:
-                self.steg.hide_message(input_path, output_path, message)
-                messagebox.showinfo("Success", f"Message hidden successfully in {output_path}!")
+                self.steg.hide_message(input_path, self.output_path, message)
+                messagebox.showinfo("Success", f"Message hidden successfully in {self.output_path}!")
             except Exception as e:
                 messagebox.showerror("Error", str(e))
 
@@ -137,3 +166,19 @@ class StegGUI:
                 messagebox.showinfo("Success", "Message extracted successfully!")
             except Exception as e:
                 messagebox.showerror("Error", str(e))
+
+    def show_spectrogram(self):
+        input_path = self.input_entry.get().strip()
+        if not input_path:
+            messagebox.showerror("Error", "Please select an input file for spectral analysis.")
+            return
+        try:
+            self.analysis.show_spectrogram(input_path)
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not generate spectrogram: {e}")
+
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = StegGUI(root)
+    root.mainloop()
